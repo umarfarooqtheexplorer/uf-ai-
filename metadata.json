@@ -1,0 +1,7 @@
+{
+  "name": "UF AI",
+  "description": "UF AI provides a seamless chat experience with various cutting-edge AI models, featuring multiple login options and a user-friendly interface.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
