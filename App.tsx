@@ -240,8 +240,8 @@ const App: React.FC = () => {
   };
 
   const handleSendMessage = async (text: string, file?: File) => {
-    const imageGenKeywords = ['generate an image', 'create an image', 'draw a picture', 'create a picture', 'generate a picture', 'make an image', 'make a picture'];
-    const isImageGenRequest = imageGenKeywords.some(kw => text.toLowerCase().trim().startsWith(kw));
+    const imageGenRegex = /^\s*(please|can you|could you|would you)?\s*(generate|create|draw|make|imagine)\s/i;
+    const isImageGenRequest = imageGenRegex.test(text);
 
     if (isImageGenRequest && !file) {
       handleGenerateImage(text);
@@ -387,13 +387,16 @@ const App: React.FC = () => {
   const handleGenerateImage = async (prompt: string) => {
     if (loadingState || !user) return;
 
+    const userMessage: ChatMessage = { id: `msg-${Date.now()}`, sender: 'user', text: prompt };
+    setMessages(prev => [...prev, userMessage]);
+    
     setLoadingState('imagining');
     
     const currentChat = chatHistory.find(c => c.id === activeChatId);
-    const conversationHistory = currentChat?.messages || [];
+    const conversationHistoryForContext = [...(currentChat?.messages || []), userMessage];
 
     try {
-      const { imageUrl, error, finalPrompt } = await generateImageFromContext(prompt, conversationHistory);
+      const { imageUrl, error, finalPrompt } = await generateImageFromContext(prompt, conversationHistoryForContext);
 
       if (error) {
         throw new Error(error);
@@ -410,7 +413,7 @@ const App: React.FC = () => {
         };
         setMessages(prev => [...prev, aiMessage]);
         
-        const updatedMessages = [...(currentChat?.messages || []), aiMessage];
+        const updatedMessages = [...conversationHistoryForContext, aiMessage];
         setChatHistory(prev => prev.map(chat => chat.id === activeChatId ? {
             ...chat,
             messages: updatedMessages,
@@ -427,6 +430,12 @@ const App: React.FC = () => {
             isError: true,
         };
         setMessages(prev => [...prev, errorMessage]);
+
+        const updatedMessages = [...conversationHistoryForContext, errorMessage];
+        setChatHistory(prev => prev.map(chat => chat.id === activeChatId ? {
+            ...chat,
+            messages: updatedMessages,
+        } : chat));
     } finally {
         setLoadingState(null);
     }

@@ -2,9 +2,11 @@ import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
 import { ChatMessage, LoadingState, ChatSession } from '../types';
 import { 
     UserIcon, CopyIcon, ThumbsUpIcon, ThumbsDownIcon, ShareIcon, 
-    RegenerateIcon, EllipsisHorizontalIcon, LinkIcon, SparklesIcon
+    RegenerateIcon, EllipsisHorizontalIcon, LinkIcon, SparklesIcon,
+    DownloadIcon
 } from './icons';
 import { AVATARS, SUBSCRIPTION_URL } from '../constants';
+import { CodeBlock } from './CodeBlock';
 
 
 interface ChatBubbleProps {
@@ -52,6 +54,16 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
           setTimeout(() => setCopied(false), 2000);
       });
   };
+  
+  const handleDownload = () => {
+    if (!message.imageUrl) return;
+    const link = document.createElement('a');
+    link.href = message.imageUrl;
+    link.download = `uf-ai-image-${message.id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const renderContent = (text: string) => {
     if (text.includes(SUBSCRIPTION_URL)) {
@@ -87,8 +99,27 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
         </div>
       );
     }
+    
+    // Split text by code blocks, keeping the delimiters
+    const parts = text.split(/(\`\`\`[\s\S]*?\`\`\`)/g);
 
-    return <p className="whitespace-pre-wrap">{text}</p>;
+    return (
+        <div className="text-left">
+            {parts.map((part, index) => {
+                const codeBlockRegex = /^\`\`\`(\w+)?\n([\s\S]+?)\n\`\`\`$/;
+                const match = part.match(codeBlockRegex);
+
+                if (match) {
+                    const language = match[1] || '';
+                    const code = match[2].trim();
+                    return <CodeBlock key={index} language={language} code={code} />;
+                } else if (part.trim()) {
+                    return <p key={index} className="whitespace-pre-wrap">{part}</p>;
+                }
+                return null;
+            })}
+        </div>
+    );
   };
 
   return (
@@ -109,11 +140,22 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
               : `bg-light-secondary dark:bg-secondary text-light-text-main dark:text-text-main rounded-bl-none ${message.isError ? 'border border-red-500' : 'border border-transparent'}`
           }`}>
           {message.imageUrl && (
-              <img 
-                  src={message.imageUrl} 
-                  alt="Uploaded content" 
-                  className="rounded-lg mb-2 max-w-xs max-h-64 object-contain"
-              />
+              <div className="relative group mb-2">
+                  <img 
+                      src={message.imageUrl} 
+                      alt="Generated image" 
+                      className="rounded-lg max-w-xs max-h-64 object-contain"
+                  />
+                   {message.sender === 'ai' && (
+                     <button
+                        onClick={handleDownload}
+                        className="absolute bottom-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/75 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        aria-label="Download image"
+                      >
+                        <DownloadIcon className="w-5 h-5" />
+                      </button>
+                   )}
+              </div>
           )}
           
           {isLastAiMessage && message.text.length === 0 && !message.imageUrl && <TypingIndicator />}
@@ -165,33 +207,45 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
   );
 };
 
-const LoadingIndicator: React.FC = () => (
-    <div className="flex items-start gap-4">
-        <div className="w-8 h-8 rounded-full bg-light-accent dark:bg-accent flex items-center justify-center shrink-0">
-            <SparklesIcon className="w-5 h-5 text-highlight animate-pulse" />
-        </div>
-        <div className="max-w-xl px-4 py-3 rounded-2xl bg-light-secondary dark:bg-secondary rounded-bl-none">
-            <div className="flex items-end justify-center space-x-1.5 h-6">
-                <div className="w-2.5 h-2.5 bg-gray-300 rounded-full animate-wave" style={{ animationDelay: '-0.3s' }}></div>
-                <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '-0.15s' }}></div>
-                <div className="w-2.5 h-2.5 bg-gray-500 rounded-full animate-wave" style={{ animationDelay: '0s' }}></div>
+const LoadingIndicator: React.FC<{ loadingState: LoadingState | null }> = ({ loadingState }) => {
+    let text = 'Thinking...';
+    if (loadingState === 'imagining') {
+        text = 'Creating image...';
+    } else if (loadingState === 'analyzing') {
+        text = 'Analyzing...';
+    }
+    
+    return (
+        <div className="flex items-start gap-4">
+            <div className="w-8 h-8 rounded-full bg-light-accent dark:bg-accent flex items-center justify-center shrink-0">
+                <SparklesIcon className="w-5 h-5 text-highlight animate-pulse" />
             </div>
+            <div className="max-w-xl px-4 py-3 rounded-2xl bg-light-secondary dark:bg-secondary rounded-bl-none">
+                <div className="flex items-center gap-2">
+                    <div className="flex items-end justify-center space-x-1.5 h-6">
+                        <div className="w-2.5 h-2.5 bg-gray-300 rounded-full animate-wave" style={{ animationDelay: '-0.3s' }}></div>
+                        <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '-0.15s' }}></div>
+                        <div className="w-2.5 h-2.5 bg-gray-500 rounded-full animate-wave" style={{ animationDelay: '0s' }}></div>
+                    </div>
+                    <span className="text-sm text-light-text-muted dark:text-gray-400 italic">{text}</span>
+                </div>
+            </div>
+             <style>{`
+                @keyframes wave {
+                  0%, 60%, 100% {
+                    transform: translateY(0);
+                  }
+                  30% {
+                    transform: translateY(-10px);
+                  }
+                }
+                .animate-wave {
+                  animation: wave 1.2s infinite ease-in-out;
+                }
+            `}</style>
         </div>
-         <style>{`
-            @keyframes wave {
-              0%, 60%, 100% {
-                transform: translateY(0);
-              }
-              30% {
-                transform: translateY(-10px);
-              }
-            }
-            .animate-wave {
-              animation: wave 1.2s infinite ease-in-out;
-            }
-        `}</style>
-    </div>
-);
+    );
+};
 
 
 interface ChatWindowProps {
@@ -283,7 +337,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loadingState, 
             avatarId={activeChatSession?.avatarId}
           />
         ))}
-        {loadingState && loadingState !== 'generating' && <LoadingIndicator />}
+        {loadingState && loadingState !== 'generating' && <LoadingIndicator loadingState={loadingState} />}
       </div>
     </div>
   );

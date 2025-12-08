@@ -211,27 +211,78 @@ In summary, your prompt is a multi-faceted topic. This structured response provi
 }
 
 export const generateImageFromContext = async (prompt: string, conversationHistory: ChatMessage[]): Promise<{ imageUrl: string | null; error: string | null; finalPrompt: string | null }> => {
-    /**
-     * REAL IMPLEMENTATION:
-     * const response = await fetch('/api/image', {
-     *     method: 'POST',
-     *     headers: { 'Content-Type': 'application/json' },
-     *     body: JSON.stringify({ prompt, conversationHistory }),
-     * });
-     * if (!response.ok) { // ...error handling... }
-     * return response.json();
-     */
+    try {
+        // Step 1: Generate a concise image prompt from the conversation context.
+        const contextSummary = conversationHistory.slice(-4).map(m => `${m.sender}: ${m.text}`).join('\n');
+        
+        // Remove the initial trigger phrase from the prompt for clarity in context
+        const cleanPrompt = prompt.replace(/^(generate an image|create an image|draw a picture|create a picture|generate a picture|make an image|make a picture)( of)? /i, '').trim();
 
-    // MOCK IMPLEMENTATION:
-    const finalPrompt = prompt || "a mock image based on conversation";
-    console.log(`[MOCK] Generating image via backend with prompt: "${finalPrompt}"`);
+        const promptGenerationInstruction = `Based on the following conversation context and the user's final request, generate a concise, descriptive, and clear prompt for an image generation model. The prompt should capture the key elements and style requested. Output ONLY the prompt text, without any extra explanations or labels.
 
-    // Return a placeholder image
-    return {
-        imageUrl: `https://via.placeholder.com/512/1a1a2e/dcdcdc.png?text=${encodeURIComponent(finalPrompt)}`,
-        error: null,
-        finalPrompt: finalPrompt,
-    };
+Context:
+${contextSummary}
+
+User's final request: "${cleanPrompt}"
+
+Image Generation Prompt:`;
+
+        let imagePrompt = cleanPrompt;
+        // Only try to generate a better prompt if there is context
+        if(conversationHistory.length > 0) {
+            const promptResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: promptGenerationInstruction,
+            });
+            
+            const generatedPrompt = promptResponse.text.trim();
+            if (generatedPrompt) {
+                imagePrompt = generatedPrompt;
+            } else {
+                console.warn("Could not generate a specific prompt from context, using original cleaned prompt.");
+            }
+        }
+        
+        // Step 2: Generate the image using the refined prompt.
+        const imageResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [{ text: imagePrompt }],
+            },
+        });
+
+        const firstCandidate = imageResponse.candidates?.[0];
+        if (!firstCandidate || !firstCandidate.content || !firstCandidate.content.parts) {
+            throw new Error("Image generation failed: No valid content returned from the API.");
+        }
+
+        const imagePart = firstCandidate.content.parts.find(part => part.inlineData);
+
+        if (imagePart && imagePart.inlineData) {
+            const base64ImageData = imagePart.inlineData.data;
+            const mimeType = imagePart.inlineData.mimeType;
+            const imageUrl = `data:${mimeType};base64,${base64ImageData}`;
+
+            return {
+                imageUrl: imageUrl,
+                error: null,
+                finalPrompt: imagePrompt,
+            };
+        } else {
+            const textPart = firstCandidate.content.parts.find(part => part.text);
+            const refusalReason = textPart?.text || "The model did not return an image. It may have refused the prompt for safety reasons.";
+            throw new Error(refusalReason);
+        }
+
+    } catch (error) {
+        console.error("Error generating image from context:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during image generation.";
+        return {
+            imageUrl: null,
+            error: errorMessage,
+            finalPrompt: prompt, // return original prompt on error
+        };
+    }
 };
 
 
