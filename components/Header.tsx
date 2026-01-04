@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { MenuIcon, CreditIcon, LinkIcon, SparklesIcon } from './icons';
+import { MenuIcon, CreditIcon, LinkIcon, SparklesIcon, BrainIcon } from './icons';
 import { User } from '../types';
 
 interface HeaderProps {
@@ -7,9 +8,10 @@ interface HeaderProps {
   webAccessEnabled: boolean;
   onToggleWebAccess: () => void;
   user: User;
+  isSavingMemory?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, webAccessEnabled, onToggleWebAccess, user }) => {
+export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, webAccessEnabled, onToggleWebAccess, user, isSavingMemory }) => {
   const FREE_MESSAGE_LIMIT = 6;
   const creditsDisplay = user.plan === 'Pro' 
     ? 'Unlimited' 
@@ -27,7 +29,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, webAccessEnable
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3">
+        {isSavingMemory && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-highlight/10 text-highlight animate-pulse border border-highlight/20">
+            <BrainIcon className="w-4 h-4" />
+            <span className="text-xs font-bold hidden sm:inline">Saving Memory...</span>
+          </div>
+        )}
         <button 
             onClick={onToggleWebAccess} 
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors duration-200 ${
@@ -37,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, webAccessEnable
             }`}
         >
             <LinkIcon className="w-5 h-5" />
-            <span>Web Access</span>
+            <span className="hidden sm:inline">Web Access</span>
         </button>
         <div className="flex items-center space-x-2 text-sm bg-light-accent/50 dark:bg-accent/50 px-3 py-1.5 rounded-full">
             <CreditIcon className="w-5 h-5 text-green-400" />

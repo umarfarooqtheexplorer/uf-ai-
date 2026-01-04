@@ -1,5 +1,6 @@
+
 import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
-import { ChatMessage, LoadingState, ChatSession } from '../types';
+import { ChatMessage, LoadingState, ChatSession, Avatar } from '../types';
 import { 
     UserIcon, CopyIcon, ThumbsUpIcon, ThumbsDownIcon, ShareIcon, 
     RegenerateIcon, EllipsisHorizontalIcon, LinkIcon, SparklesIcon,
@@ -15,6 +16,7 @@ interface ChatBubbleProps {
   onRegenerate: () => void;
   isLastAiMessage: boolean;
   avatarId?: string;
+  customAvatar?: Avatar;
 }
 
 const TypingIndicator = () => (
@@ -35,18 +37,20 @@ const TypingIndicator = () => (
 );
 
 
-const ActionButton: React.FC<{ icon: React.ElementType, onClick?: () => void, isActive?: boolean, children?: React.ReactNode, disabled?: boolean }> = ({ icon: Icon, onClick, isActive, children, disabled }) => (
-    <button onClick={onClick} disabled={disabled} className={`p-1.5 rounded-full transition-colors duration-200 ${isActive ? 'text-highlight bg-highlight/20' : 'text-light-text-muted dark:text-gray-400 hover:bg-light-accent dark:hover:bg-accent/80 hover:text-light-text-main dark:hover:text-text-main'} disabled:opacity-50 disabled:cursor-not-allowed`}>
+const ActionButton: React.FC<{ icon: React.ElementType, onClick?: () => void, isActive?: boolean, children?: React.ReactNode, disabled?: boolean, title?: string }> = ({ icon: Icon, onClick, isActive, children, disabled, title }) => (
+    <button onClick={onClick} disabled={disabled} title={title} className={`p-1.5 rounded-full transition-colors duration-200 ${isActive ? 'text-highlight bg-highlight/20' : 'text-light-text-muted dark:text-gray-400 hover:bg-light-accent dark:hover:bg-accent/80 hover:text-light-text-main dark:hover:text-text-main'} disabled:opacity-50 disabled:cursor-not-allowed`}>
         <Icon className="w-5 h-5" />
         {children}
     </button>
 );
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenerate, isLastAiMessage, avatarId }) => {
+const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenerate, isLastAiMessage, avatarId, customAvatar }) => {
   const isUser = message.sender === 'user';
   const ModelIcon = message.model?.icon;
   const [copied, setCopied] = useState(false);
-  const avatar = avatarId ? AVATARS.find(a => a.id === avatarId) : undefined;
+
+  // Determine avatar image: customAvatar has priority if IDs match
+  const avatar = customAvatar?.id === avatarId ? customAvatar : (avatarId ? AVATARS.find(a => a.id === avatarId) : undefined);
 
   const handleCopy = () => {
       navigator.clipboard.writeText(message.text).then(() => {
@@ -100,7 +104,6 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
       );
     }
     
-    // Split text by code blocks, keeping the delimiters
     const parts = text.split(/(\`\`\`[\s\S]*?\`\`\`)/g);
 
     return (
@@ -125,9 +128,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
   return (
     <div className={`flex items-start gap-4 ${isUser ? 'justify-end' : ''}`}>
       {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-light-accent dark:bg-accent flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-full bg-light-accent dark:bg-accent flex items-center justify-center shrink-0 overflow-hidden">
             {avatar ? (
-                <img src={avatar.imageUrl} alt={avatar.name} className="w-full h-full rounded-full object-cover" />
+                <img src={avatar.imageUrl} alt={avatar.name} className="w-full h-full object-cover" />
             ) : (
                 ModelIcon ? <ModelIcon className="w-5 h-5 text-light-text-main dark:text-text-main" /> : null
             )}
@@ -143,7 +146,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
               <div className="relative group mb-2">
                   <img 
                       src={message.imageUrl} 
-                      alt="Generated image" 
+                      alt="Contextual image" 
                       className="rounded-lg max-w-xs max-h-64 object-contain"
                   />
                    {message.sender === 'ai' && (
@@ -187,12 +190,12 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onFeedback, onRegenera
            <div className="mt-2 px-2">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
-                    <ActionButton icon={CopyIcon} onClick={handleCopy} />
-                    <ActionButton icon={ThumbsUpIcon} onClick={() => onFeedback(message.id, 'like')} isActive={message.liked === true} />
-                    <ActionButton icon={ThumbsDownIcon} onClick={() => onFeedback(message.id, 'dislike')} isActive={message.liked === false}/>
-                    <ActionButton icon={ShareIcon} />
-                    {isLastAiMessage && <ActionButton icon={RegenerateIcon} onClick={onRegenerate} />}
-                    <ActionButton icon={EllipsisHorizontalIcon} />
+                    <ActionButton icon={CopyIcon} onClick={handleCopy} title="Copy" />
+                    <ActionButton icon={ThumbsUpIcon} onClick={() => onFeedback(message.id, 'like')} isActive={message.liked === true} title="Like" />
+                    <ActionButton icon={ThumbsDownIcon} onClick={() => onFeedback(message.id, 'dislike')} isActive={message.liked === false} title="Dislike" />
+                    <ActionButton icon={ShareIcon} title="Share" />
+                    {isLastAiMessage && <ActionButton icon={RegenerateIcon} onClick={onRegenerate} title="Regenerate" />}
+                    <ActionButton icon={EllipsisHorizontalIcon} title="More" />
                 </div>
             </div>
            </div>
@@ -213,6 +216,8 @@ const LoadingIndicator: React.FC<{ loadingState: LoadingState | null }> = ({ loa
         text = 'Creating image...';
     } else if (loadingState === 'analyzing') {
         text = 'Analyzing...';
+    } else if (loadingState === 'researching') {
+        text = 'Researching person...';
     }
     
     return (
@@ -232,16 +237,10 @@ const LoadingIndicator: React.FC<{ loadingState: LoadingState | null }> = ({ loa
             </div>
              <style>{`
                 @keyframes wave {
-                  0%, 60%, 100% {
-                    transform: translateY(0);
-                  }
-                  30% {
-                    transform: translateY(-10px);
-                  }
+                  0%, 60%, 100% { transform: translateY(0); }
+                  30% { transform: translateY(-10px); }
                 }
-                .animate-wave {
-                  animation: wave 1.2s infinite ease-in-out;
-                }
+                .animate-wave { animation: wave 1.2s infinite ease-in-out; }
             `}</style>
         </div>
     );
@@ -259,12 +258,12 @@ interface ChatWindowProps {
   activeChatSession?: ChatSession | null;
 }
 
-const IntroBubble: React.FC<{ text: string; avatarId: string }> = ({ text, avatarId }) => {
-    const avatar = AVATARS.find(a => a.id === avatarId);
+const IntroBubble: React.FC<{ text: string; avatarId: string; customAvatar?: Avatar }> = ({ text, avatarId, customAvatar }) => {
+    const avatar = customAvatar?.id === avatarId ? customAvatar : AVATARS.find(a => a.id === avatarId);
     return (
         <div className="flex items-start gap-4">
-            <div className="w-8 h-8 rounded-full bg-light-accent dark:bg-accent flex items-center justify-center shrink-0">
-                {avatar && <img src={avatar.imageUrl} alt={avatar.name} className="w-full h-full rounded-full object-cover" />}
+            <div className="w-8 h-8 rounded-full bg-light-accent dark:bg-accent flex items-center justify-center shrink-0 overflow-hidden">
+                {avatar && <img src={avatar.imageUrl} alt={avatar.name} className="w-full h-full object-cover" />}
             </div>
             <div className={`max-w-xl`}>
                 <div className={`p-4 rounded-2xl bg-light-secondary dark:bg-secondary text-light-text-main dark:text-text-main rounded-bl-none`}>
@@ -280,21 +279,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loadingState, 
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number | null>(null);
 
-  const showIntro = !!(activeChatSession?.avatarId && activeChatSession.introMessage && messages.length === 0 && !loadingState);
+  const showIntro = !!(activeChatSession?.introMessage && messages.length === 0 && !loadingState);
 
   useLayoutEffect(() => {
     const scrollNode = scrollRef.current;
     if (!scrollNode) return;
 
     if (isLoadingMore) {
-      // About to load more messages, save the current scroll height.
       prevScrollHeightRef.current = scrollNode.scrollHeight;
     } else if (prevScrollHeightRef.current !== null) {
-      // More messages have been prepended, restore scroll position.
       scrollNode.scrollTop = scrollNode.scrollHeight - prevScrollHeightRef.current;
-      prevScrollHeightRef.current = null; // Reset for next load
+      prevScrollHeightRef.current = null;
     } else {
-      // Default behavior for new messages added to the end.
       scrollNode.scrollTop = scrollNode.scrollHeight;
     }
   }, [messages, isLoadingMore]);
@@ -326,7 +322,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loadingState, 
     <div className="p-6 h-full overflow-y-auto" ref={scrollRef}>
       <div className="flex flex-col space-y-6">
         {isLoadingMore && <div className="text-center text-light-text-muted dark:text-gray-400 py-4">Loading history...</div>}
-        {showIntro && <IntroBubble text={activeChatSession.introMessage!} avatarId={activeChatSession.avatarId!} />}
+        {showIntro && (
+            <IntroBubble 
+                text={activeChatSession.introMessage!} 
+                avatarId={activeChatSession.avatarId!} 
+                customAvatar={activeChatSession.customAvatar} 
+            />
+        )}
         {messages.map((msg, index) => (
           <ChatBubble 
             key={msg.id} 
@@ -335,6 +337,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loadingState, 
             onRegenerate={onRegenerate}
             isLastAiMessage={msg.sender === 'ai' && index === lastAiMessageIndex}
             avatarId={activeChatSession?.avatarId}
+            customAvatar={activeChatSession?.customAvatar}
           />
         ))}
         {loadingState && loadingState !== 'generating' && <LoadingIndicator loadingState={loadingState} />}

@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export interface User {
@@ -13,6 +14,21 @@ export interface User {
   theme: 'light' | 'dark';
   selectedModelId: string;
   messageCount: number;
+  
+  // New Settings Fields
+  language: string;
+  spokenLanguage: string;
+  voice: string;
+  accentColor: string;
+  notifications: {
+    responses: string;
+    tasks: string;
+    recommendations: string;
+  };
+  smartSuggestions: boolean;
+  autoSummarize: boolean;
+  mfaEnabled: boolean;
+  connectedApps: string[];
 }
 
 export interface AIModel {
@@ -35,7 +51,7 @@ export interface ChatMessage {
   timestamp?: number;
   model?: AIModel;
   isError?: boolean;
-  liked?: boolean | null; // true for like, false for dislike, null for neutral
+  liked?: boolean | null;
   sources?: Source[];
 }
 
@@ -43,6 +59,8 @@ export interface Avatar {
   id: string;
   name: string;
   imageUrl: string;
+  systemPrompt?: string;
+  greeting?: string;
 }
 
 export interface ChatSession {
@@ -54,6 +72,7 @@ export interface ChatSession {
   projectId?: string | null;
   avatarId?: string;
   introMessage?: string;
+  customAvatar?: Avatar;
 }
 
 export interface ProjectCategory {
@@ -71,4 +90,4 @@ export interface Project {
 
 export type TabId = 'General' | 'Notifications' | 'Personalization' | 'Apps & Connectors' | 'Data controls' | 'Security' | 'Parental controls' | 'Account' | 'About';
 
-export type LoadingState = 'generating' | 'analyzing' | 'imagining';
+export type LoadingState = 'generating' | 'analyzing' | 'imagining' | 'researching';
